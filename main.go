@@ -87,8 +87,8 @@ func pull_photos(conn *ftp.ServerConn, source_path, dest_path string) {
 	}
 }
 
-func process_screenshots(path string) (string, string, string, string) {
-	var fiber, carbs, fats, protein string
+func process_screenshots(path string) (string, string, string, string, string, string, string) {
+	var cals_consumed, cals_cap, fiber, carbs, fats, protein, fitness_calories string
 	year, month, day := time.Now().Date()
 	screenshot_path := path + "/" + fmt.Sprintf("%d%02d%02d/Screenshots", year, month, day)
 	listDir, err := ioutil.ReadDir(screenshot_path)
@@ -98,37 +98,67 @@ func process_screenshots(path string) (string, string, string, string) {
 		client.SetImage(screenshot_path + "/" + file.Name())
 		text, _ := client.Text()
 		if strings.Contains(text, "fibre Consumed") {
-			fiber = extract_value(text, "Fiber")
+			fiber = extract_value(text)
 		} else if strings.Contains(text, "carbs Consumed") {
-			carbs = extract_value(text, "Carbs")
+			carbs = extract_value(text)
 		} else if strings.Contains(text, "fats Consumed") {
-			fats = extract_value(text, "Fats")
+			fats = extract_value(text)
 		} else if strings.Contains(text, "protein Consumed") {
-			protein = extract_value(text, "Protein")
+			protein = extract_value(text)
+		} else if strings.Contains(text, "Cal Burnt") {
+			fitness_calories = extract_cal_burnt(text)
+		} else if strings.Contains(text, "Cal Eaten") {
+			cals_consumed, cals_cap = extract_cals_for_day(text)
 		} else {
 			fmt.Println("Screenshot does not fit in the preset templates")
 		}
 	}
-	fmt.Printf("Fiber %s; Carbs %s; Fats %s; Protein %s\n", fiber, carbs, fats, protein)
-	return fiber, carbs, fats, protein
+	fmt.Printf("Cals Consumed %s; Cals Cap %s; Fiber %s; Carbs %s; Fats %s; Protein %s; Cal Burnt %s\n",
+		cals_consumed, cals_cap, fiber, carbs, fats, protein, fitness_calories)
+	return cals_consumed, cals_cap, fiber, carbs, fats, protein, fitness_calories
 }
 
-func write_to_csv(path_to_csv, fiber, carbs, fats, protein string) {
+func write_to_csv(path_to_csv, cal_consumed, cal_cap, fiber, carbs, fats, protein, cal_burnt string) {
 	file, err := os.OpenFile(path_to_csv, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	check_err(err)
 	defer file.Close()
 	year, month, date := time.Now().Date()
 	string_date := fmt.Sprintf("%d/%02d/%02d", year, month, date)
-	text_for_csv := fmt.Sprintf("%s,%s,%s,%s,%s\n", string_date, fiber, carbs, fats, protein)
+	text_for_csv := fmt.Sprintf("%s,%s,%s,%s,%s,%s,%s,%s\n",
+		string_date, cal_consumed, cal_cap, fiber, carbs, fats, protein, cal_burnt)
 	_, err = file.WriteString(text_for_csv)
 	check_err(err)
 }
 
-func extract_value(text, macro string) string {
+func extract_cals_for_day(text string) (string, string) {
+	var to_ret1, to_ret2 string
+	for _, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, "of") {
+			to_ret1, to_ret2 = strings.Replace(strings.Split(line, "of")[0], ",", "", -1), strings.Replace(strings.Split(line, "of")[1], ",", "", -1)
+			break
+		}
+	}
+	return to_ret1, to_ret2
+}
+
+func extract_cal_burnt(text string) string {
+	var to_ret string
+	for _, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, "of") {
+			println(line)
+			to_ret = strings.Split(line, "of")[0]
+			break
+		}
+	}
+	return to_ret
+}
+
+func extract_value(text string) string {
 	var to_ret string
 	for _, line := range strings.Split(text, "\n") {
 		if strings.Contains(line, "/") {
 			to_ret = strings.Split(line, "/")[0]
+			break
 		}
 	}
 	return to_ret
@@ -143,7 +173,7 @@ func main() {
 	create_directory_structure(config["local_store_path"])
 	pull_screenshots(connection, config["screenshot_path"], config["local_store_path"])
 	pull_photos(connection, config["photos_path"], config["local_store_path"])
-	fiber, carbs, fats, protein := process_screenshots(config["local_store_path"])
-	write_to_csv(config["csv_path"], fiber, carbs, fats, protein)
+	cal_consumed, cal_cap, fiber, carbs, fats, protein, cal_burnt := process_screenshots(config["local_store_path"])
+	write_to_csv(config["csv_path"], cal_consumed, cal_cap, fiber, carbs, fats, protein, cal_burnt)
 	connection.Quit()
 }
