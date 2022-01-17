@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -42,11 +43,11 @@ func make_ftp_connection(ip, port, username, password string) *ftp.ServerConn {
 
 func create_directory_structure(path string) {
 	year, month, day := time.Now().Date()
-	parent_dir := path + "/" + fmt.Sprintf("%d%02d%02d", year, month, day)
+	parent_dir := filepath.Join(path, fmt.Sprintf("%d%02d%02d", year, month, day))
 	err := os.MkdirAll(parent_dir, os.ModePerm)
 	check_err(err)
-	sc_dir := parent_dir + "/Screenshots"
-	pic_dir := parent_dir + "/Pictures"
+	sc_dir := filepath.Join(parent_dir, "Screenshots")
+	pic_dir := filepath.Join(parent_dir, "Pictures")
 	err = os.MkdirAll(sc_dir, os.ModePerm)
 	check_err(err)
 	err = os.MkdirAll(pic_dir, os.ModePerm)
@@ -57,15 +58,15 @@ func pull_screenshots(conn *ftp.ServerConn, source_path, dest_path string) {
 	listDir, err := conn.NameList(source_path)
 	check_err(err)
 	year, month, day := time.Now().Date()
-	screenshot_path := dest_path + "/" + fmt.Sprintf("%d%02d%02d/Screenshots", year, month, day)
+	screenshot_path := filepath.Join(dest_path, fmt.Sprintf("%d%02d%02d", year, month, day), "Screenshot")
 	for _, screenshot := range listDir {
 		if strings.Contains(screenshot, fmt.Sprintf("Screenshot_%d%02d%02d", year, int(month), day)) {
-			response, err := conn.Retr(source_path + "/" + screenshot)
+			response, err := conn.Retr(filepath.Join(source_path, screenshot))
 			check_err(err)
 			buffer, err := ioutil.ReadAll(response)
 			check_err(err)
 			response.Close()
-			os.WriteFile(screenshot_path+"/"+screenshot, buffer, 0644)
+			os.WriteFile(filepath.Join(screenshot_path, screenshot), buffer, 0644)
 		}
 	}
 }
@@ -74,15 +75,15 @@ func pull_photos(conn *ftp.ServerConn, source_path, dest_path string) {
 	listDir, err := conn.NameList(source_path)
 	check_err(err)
 	year, month, day := time.Now().Date()
-	photo_path := dest_path + "/" + fmt.Sprintf("%d%02d%02d/Pictures", year, month, day)
+	photo_path := filepath.Join(dest_path, fmt.Sprintf("%d%02d%02d", year, month, day), "Pictures")
 	for _, photo := range listDir {
 		if strings.Contains(photo, fmt.Sprintf("IMG_%d%02d%02d", year, month, day)) {
-			response, err := conn.Retr(source_path + "/" + photo)
+			response, err := conn.Retr(filepath.Join(source_path, photo))
 			check_err(err)
 			buffer, err := ioutil.ReadAll(response)
 			check_err(err)
 			response.Close()
-			os.WriteFile(photo_path+"/"+photo, buffer, 0644)
+			os.WriteFile(filepath.Join(photo_path, photo), buffer, 0644)
 		}
 	}
 }
@@ -90,12 +91,12 @@ func pull_photos(conn *ftp.ServerConn, source_path, dest_path string) {
 func process_screenshots(path string) (string, string, string, string, string, string, string) {
 	var cals_consumed, cals_cap, fiber, carbs, fats, protein, fitness_calories string
 	year, month, day := time.Now().Date()
-	screenshot_path := path + "/" + fmt.Sprintf("%d%02d%02d/Screenshots", year, month, day)
+	screenshot_path := filepath.Join(path, fmt.Sprintf("%d%02d%02d", year, month, day), "Screenshot")
 	listDir, err := ioutil.ReadDir(screenshot_path)
 	check_err(err)
 	for _, file := range listDir {
 		client := gosseract.NewClient()
-		client.SetImage(screenshot_path + "/" + file.Name())
+		client.SetImage(filepath.Join(screenshot_path, file.Name()))
 		text, _ := client.Text()
 		if strings.Contains(text, "fibre Consumed") {
 			fiber = extract_value(text)
@@ -123,7 +124,7 @@ func write_to_csv(path_to_csv, cal_consumed, cal_cap, fiber, carbs, fats, protei
 	check_err(err)
 	defer file.Close()
 	year, month, date := time.Now().Date()
-	string_date := fmt.Sprintf("%d/%02d/%02d", year, month, date)
+	string_date := fmt.Sprintf(filepath.Join("%d", "%02d", "%02d"), year, month, date)
 	text_for_csv := fmt.Sprintf("%s,%s,%s,%s,%s,%s,%s,%s\n",
 		string_date, cal_consumed, cal_cap, fiber, carbs, fats, protein, cal_burnt)
 	_, err = file.WriteString(text_for_csv)
@@ -134,7 +135,8 @@ func extract_cals_for_day(text string) (string, string) {
 	var to_ret1, to_ret2 string
 	for _, line := range strings.Split(text, "\n") {
 		if strings.Contains(line, "of") {
-			to_ret1, to_ret2 = strings.Replace(strings.Split(line, "of")[0], ",", "", -1), strings.Replace(strings.Split(line, "of")[1], ",", "", -1)
+			to_ret1, to_ret2 = strings.Replace(strings.Split(line, "of")[0], ",", "", -1),
+				strings.Replace(strings.Split(line, "of")[1], ",", "", -1)
 			break
 		}
 	}
