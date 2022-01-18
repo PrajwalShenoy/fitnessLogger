@@ -58,7 +58,7 @@ func pull_screenshots(conn *ftp.ServerConn, source_path, dest_path string) {
 	listDir, err := conn.NameList(source_path)
 	check_err(err)
 	year, month, day := time.Now().Date()
-	screenshot_path := filepath.Join(dest_path, fmt.Sprintf("%d%02d%02d", year, month, day), "Screenshot")
+	screenshot_path := filepath.Join(dest_path, fmt.Sprintf("%d%02d%02d", year, month, day), "Screenshots")
 	for _, screenshot := range listDir {
 		if strings.Contains(screenshot, fmt.Sprintf("Screenshot_%d%02d%02d", year, int(month), day)) {
 			response, err := conn.Retr(filepath.Join(source_path, screenshot))
@@ -91,7 +91,7 @@ func pull_photos(conn *ftp.ServerConn, source_path, dest_path string) {
 func process_screenshots(path string) (string, string, string, string, string, string, string) {
 	var cals_consumed, cals_cap, fiber, carbs, fats, protein, fitness_calories string
 	year, month, day := time.Now().Date()
-	screenshot_path := filepath.Join(path, fmt.Sprintf("%d%02d%02d", year, month, day), "Screenshot")
+	screenshot_path := filepath.Join(path, fmt.Sprintf("%d%02d%02d", year, month, day), "Screenshots")
 	listDir, err := ioutil.ReadDir(screenshot_path)
 	check_err(err)
 	for _, file := range listDir {
